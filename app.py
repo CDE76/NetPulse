@@ -1195,17 +1195,41 @@ class IPAMRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": False, "error": str(exc)}, status=500)
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8080):
+class ReusableThreadingHTTPServer(ThreadingHTTPServer):
+    allow_reuse_address = True
+
+
+def run_server(host: str = "0.0.0.0", port: int = 8095):
     init_db()
-    server = ThreadingHTTPServer((host, port), IPAMRequestHandler)
+    candidate_ports = [port, 8095, 8088, 8085, 8888, 9095]
+    # Dédupliquer tout en gardant l'ordre
+    seen = set()
+    ports_to_try = [p for p in candidate_ports if not (p in seen or seen.add(p))]
+
+    server = None
+    bound_port = port
+    last_err = None
+    for p in ports_to_try:
+        try:
+            server = ReusableThreadingHTTPServer((host, p), IPAMRequestHandler)
+            bound_port = p
+            break
+        except OSError as err:
+            last_err = err
+            print(f"[Info] Le port {p} est déjà utilisé sur cet hôte, essai du port suivant...")
+
+    if server is None:
+        raise last_err
+
     ifaces = get_local_interfaces()
-    print("=" * 65)
-    print("  IPAM & Scanner Réseau Local IPv4 - Serveur Web Démarré")
-    print("=" * 65)
-    print(f"  URL Locale       : http://localhost:{port}")
+    print("=" * 65, flush=True)
+    print("  IPAM & Scanner Réseau Local IPv4 - Serveur Web Démarré", flush=True)
+    print("=" * 65, flush=True)
+    print(f"  Port actif       : {bound_port}", flush=True)
+    print(f"  URL Locale       : http://localhost:{bound_port}", flush=True)
     for iface in ifaces:
-        print(f"  Interface détectée: {iface['name']} -> {iface['ip']} ({iface['cidr']} / Masque {iface['netmask']})")
-    print("=" * 65)
+        print(f"  URL Réseau (LAN) : http://{iface['ip']}:{bound_port}  ({iface['name']} - {iface['cidr']})", flush=True)
+    print("=" * 65, flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -1214,5 +1238,5 @@ def run_server(host: str = "0.0.0.0", port: int = 8080):
 
 
 if __name__ == "__main__":
-    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("PORT", "8080"))
+    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("PORT", "8095"))
     run_server(port=port_arg)
