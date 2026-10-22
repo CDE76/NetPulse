@@ -1,22 +1,32 @@
+version: "3.8"
+
 services:
   netpulse-ipam:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: netpulse-ipam
+    image: python:3.12-slim
     restart: unless-stopped
-    # network_mode: host permet au conteneur d'accéder directement au réseau local (LAN),
-    # aux interfaces de l'hôte et à la table ARP réelle pour détecter les adresses MAC.
-    network_mode: host
-    cap_add:
-      - NET_RAW
-      - NET_ADMIN
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - |
+        apt-get update &&
+        apt-get install -y --no-install-recommends iputils-ping iproute2 net-tools dnsutils ca-certificates &&
+        python3 -c "import urllib.request, tarfile, shutil; urllib.request.urlretrieve('https://github.com/CDE76/NetPulse/archive/refs/heads/main.tar.gz', '/tmp/app.tar.gz'); tarfile.open('/tmp/app.tar.gz').extractall('/tmp'); shutil.copytree('/tmp/NetPulse-main', '/app', dirs_exist_ok=True)" &&
+        python3 /app/app.py
     environment:
-      - PORT=${PORT:-8080}
+      - PYTHONUNBUFFERED=1
+      - PORT=8080
       - IPAM_DATA_DIR=/data
-      - TZ=${TZ:-Europe/Paris}
+      - TZ=Europe/Paris
     volumes:
       - ipam_data:/data
+    networks:
+      - hostnet
+
+networks:
+  hostnet:
+    external: true
+    name: host
 
 volumes:
   ipam_data:
