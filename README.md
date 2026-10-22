@@ -82,7 +82,10 @@ Le projet inclut un [`Dockerfile`](./Dockerfile) et un fichier [`docker-compose.
 
 | Variable | Valeur par défaut | Description |
 | :--- | :--- | :--- |
-| `PORT` | `8080` | Port d'écoute du serveur web NetPulse IPAM |
+| `PORT` | `8095` | Port d'écoute du serveur web NetPulse IPAM (bascule automatiquement sur un port libre si occupé) |
+| `IPAM_ADMIN_USER` | `admin` | Identifiant administrateur créé au premier démarrage |
+| `IPAM_ADMIN_PASSWORD` | `admin123` | Mot de passe initial (modifiable ensuite directement dans l'interface web) |
+| `IPAM_FORCE_ENV_PASSWORD` | `0` | Mettre à `1` pour forcer la réinitialisation du mot de passe avec `IPAM_ADMIN_PASSWORD` |
 | `TZ` | `Europe/Paris` | Fuseau horaire pour l'horodatage des scans et rapports PDF |
 | `IPAM_DATA_DIR` | `/data` | Répertoire interne du volume persistant SQLite |
 

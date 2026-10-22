@@ -21,6 +21,8 @@ services:
       - DEBIAN_FRONTEND=noninteractive
       - PORT=${PORT:-8095}
       - IPAM_DATA_DIR=/data
+      - IPAM_ADMIN_USER=${IPAM_ADMIN_USER:-admin}
+      - IPAM_ADMIN_PASSWORD=${IPAM_ADMIN_PASSWORD:-admin123}
       - TZ=${TZ:-Europe/Paris}
     volumes:
       - ipam_data:/data

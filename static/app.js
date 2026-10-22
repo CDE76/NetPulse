@@ -130,7 +130,25 @@ function escapeHtml(str) {
 async function initApp() {
   bindEvents();
   try {
+    const authRes = await fetch("/api/auth/me");
+    if (authRes.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
+    const authData = await authRes.json();
+    if (authData.ok) {
+      state.currentUser = authData.username;
+      state.users = authData.users || [];
+      const elUserLbl = document.getElementById("currentUserLabel");
+      if (elUserLbl) elUserLbl.textContent = authData.username;
+      renderUsersTable();
+    }
+
     const res = await fetch("/api/interfaces");
+    if (res.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
     const data = await res.json();
 
     renderInterfacesPills(data.interfaces || []);
@@ -1096,6 +1114,110 @@ function bindEvents() {
   });
   elInputImportFile.addEventListener("change", handleImportFileChange);
   elImportPlanForm.addEventListener("submit", submitImportPlan);
+
+  // Modal 4 : Gestion Compte & Déconnexion
+  const elAccountModal = document.getElementById("accountModalBackdrop");
+  document.getElementById("btnOpenAccountModal").addEventListener("click", async () => {
+    const res = await fetch("/api/auth/me");
+    const data = await res.json();
+    if (data.ok) {
+      state.currentUser = data.username;
+      state.users = data.users || [];
+      document.getElementById("modalAccountUsername").textContent = data.username;
+      renderUsersTable();
+    }
+    elAccountModal.classList.remove("hidden");
+  });
+  document.getElementById("btnCloseAccountModal").addEventListener("click", () => {
+    elAccountModal.classList.add("hidden");
+  });
+  elAccountModal.addEventListener("click", (e) => {
+    if (e.target === elAccountModal) elAccountModal.classList.add("hidden");
+  });
+
+  document.getElementById("changePasswordForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const curPwd = document.getElementById("inputCurrentPwd").value;
+    const newPwd = document.getElementById("inputNewPwd").value;
+    const res = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password: curPwd, new_password: newPwd }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("inputCurrentPwd").value = "";
+      document.getElementById("inputNewPwd").value = "";
+      showToast("Mot de passe mis à jour avec succès !", "success");
+    } else {
+      showToast(data.error || "Erreur lors du changement de mot de passe", "error");
+    }
+  });
+
+  document.getElementById("createUserForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const uName = document.getElementById("inputNewUsername").value.trim();
+    const uPwd = document.getElementById("inputNewUserPwd").value;
+    const res = await fetch("/api/auth/user/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: uName, password: uPwd }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById("inputNewUsername").value = "";
+      document.getElementById("inputNewUserPwd").value = "";
+      state.users = data.users || [];
+      renderUsersTable();
+      showToast(`Utilisateur "${uName}" créé avec succès.`, "success");
+    } else {
+      showToast(data.error || "Erreur de création", "error");
+    }
+  });
+
+  document.getElementById("btnLogout").addEventListener("click", async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  });
+}
+
+function renderUsersTable() {
+  const tbody = document.getElementById("usersTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  (state.users || []).forEach((u) => {
+    const tr = document.createElement("tr");
+    const isSelf = u.username === state.currentUser;
+    tr.innerHTML = `
+      <td class="mono"><strong>${escapeHtml(u.username)}</strong> ${isSelf ? '<span class="status-pill status-active">Vous</span>' : ""}</td>
+      <td>${escapeHtml(u.role || "admin")}</td>
+      <td class="mono">${escapeHtml(u.created_at || "—")}</td>
+      <td class="text-right">
+        ${
+          !isSelf
+            ? `<button type="button" class="btn btn-danger-sm btn-sm btn-del-user">Supprimer</button>`
+            : ""
+        }
+      </td>
+    `;
+    const delBtn = tr.querySelector(".btn-del-user");
+    if (delBtn) {
+      delBtn.addEventListener("click", async () => {
+        const res = await fetch("/api/auth/user/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u.username }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          state.users = data.users || [];
+          renderUsersTable();
+          showToast(`Utilisateur "${u.username}" supprimé.`, "info");
+        }
+      });
+    }
+    tbody.appendChild(tr);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", initApp);

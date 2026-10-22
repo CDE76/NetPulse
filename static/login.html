@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion — NetPulse IPAM</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    body.login-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.14), transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1), transparent 40%),
+        var(--bg-body);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 430px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 2.2rem 2rem;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+    .login-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0.75rem;
+      margin-bottom: 1.8rem;
+    }
+    .login-brand .brand-logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+    }
+    .login-brand .brand-logo svg {
+      width: 30px;
+      height: 30px;
+    }
+    .login-brand h1 {
+      font-size: 1.45rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .login-error {
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      padding: 0.7rem 0.9rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+    .login-footer {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="6" rx="1.5"></rect>
+          <rect x="2" y="13" width="20" height="6" rx="1.5"></rect>
+          <circle cx="6" cy="6" r="1" fill="currentColor"></circle>
+          <circle cx="6" cy="16" r="1" fill="currentColor"></circle>
+          <path d="M10 6h8M10 16h8M12 19v3M8 22h8"></path>
+        </svg>
+      </div>
+      <div>
+        <h1>NetPulse <span class="badge-accent">IPAM</span></h1>
+        <p class="text-muted">Authentification Administrateur Réseau</p>
+      </div>
+    </div>
+
+    <div id="loginErrorBox" class="login-error hidden"></div>
+
+    <form id="loginForm" class="login-form">
+      <div class="form-group">
+        <label for="inputUsername">Identifiant</label>
+        <input
+          type="text"
+          id="inputUsername"
+          placeholder="admin"
+          required
+          autofocus
+          autocomplete="username"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="inputPassword">Mot de passe</label>
+        <input
+          type="password"
+          id="inputPassword"
+          placeholder="••••••••"
+          required
+          autocomplete="current-password"
+        />
+      </div>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkRemember" checked />
+        <span>Maintenir la session ouverte (7 jours)</span>
+      </label>
+
+      <button type="submit" id="btnLoginSubmit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 0.3rem;">
+        Se connecter à l'IPAM
+      </button>
+    </form>
+
+    <div class="login-footer">
+      Accès protégé • Scanner IPv4, DNS, ARP &amp; Plan d'adressage
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("loginForm");
+    const errBox = document.getElementById("loginErrorBox");
+    const btn = document.getElementById("btnLoginSubmit");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errBox.classList.add("hidden");
+      btn.disabled = true;
+      btn.textContent = "Vérification...";
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: document.getElementById("inputUsername").value.trim(),
+            password: document.getElementById("inputPassword").value,
+            remember: document.getElementById("chkRemember").checked,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          window.location.href = "/";
+        } else {
+          errBox.textContent = data.error || "Identifiant ou mot de passe incorrect.";
+          errBox.classList.remove("hidden");
+          btn.disabled = false;
+          btn.textContent = "Se connecter à l'IPAM";
+        }
+      } catch (err) {
+        errBox.textContent = "Erreur de connexion au serveur : " + err.message;
+        errBox.classList.remove("hidden");
+        btn.disabled = false;
+        btn.textContent = "Se connecter à l'IPAM";
+      }
+    });
+  </script>
+</body>
+</html>

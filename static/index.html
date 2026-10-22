@@ -63,6 +63,14 @@
       <button id="btnExportAllCsv" class="btn btn-outline" title="Exporter tout le plan d'adressage du sous-réseau en CSV">
         Exporter Plan Complet (CSV)
       </button>
+
+      <!-- Compte & Déconnexion -->
+      <button id="btnOpenAccountModal" class="btn btn-secondary" title="Changer le mot de passe ou gérer les comptes administrateurs">
+        👤 <span id="currentUserLabel">admin</span>
+      </button>
+      <button id="btnLogout" class="btn btn-danger-sm" title="Se déconnecter">
+        Déconnexion
+      </button>
     </div>
   </header>
 
@@ -556,6 +564,75 @@
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4 : Gestion du Compte & Utilisateurs -->
+  <div id="accountModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Sécurité &amp; Gestion des Comptes</h3>
+        </div>
+        <button type="button" id="btnCloseAccountModal" class="btn-icon" aria-label="Fermer">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="changePasswordForm" class="modal-form">
+          <strong>Modifier mon mot de passe (<span id="modalAccountUsername" class="mono">admin</span>)</strong>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="inputCurrentPwd">Mot de passe actuel</label>
+              <input type="password" id="inputCurrentPwd" required placeholder="••••••••" />
+            </div>
+            <div class="form-group">
+              <label for="inputNewPwd">Nouveau mot de passe</label>
+              <input type="password" id="inputNewPwd" required placeholder="Min. 4 caractères" />
+            </div>
+          </div>
+          <div class="modal-footer" style="margin-top: 0;">
+            <button type="submit" class="btn btn-primary btn-sm">Mettre à jour mon mot de passe</button>
+          </div>
+        </form>
+
+        <hr class="divider" />
+
+        <form id="createUserForm" class="modal-form">
+          <strong>Ajouter un nouvel utilisateur</strong>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="inputNewUsername">Identifiant</label>
+              <input type="text" id="inputNewUsername" required placeholder="ex: tech-reseau" />
+            </div>
+            <div class="form-group">
+              <label for="inputNewUserPwd">Mot de passe</label>
+              <input type="password" id="inputNewUserPwd" required placeholder="••••••••" />
+            </div>
+          </div>
+          <div class="modal-footer" style="margin-top: 0;">
+            <button type="submit" class="btn btn-secondary btn-sm">Créer l'utilisateur</button>
+          </div>
+        </form>
+
+        <hr class="divider" />
+
+        <div>
+          <strong>Comptes enregistrés :</strong>
+          <div class="table-responsive" style="margin-top: 0.5rem;">
+            <table class="ipam-table">
+              <thead>
+                <tr>
+                  <th>Identifiant</th>
+                  <th>Rôle</th>
+                  <th>Créé le</th>
+                  <th class="text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>

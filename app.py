@@ -8,15 +8,19 @@ Supporte :
 """
 
 import csv
+import hashlib
+import hmac
 import io
 import ipaddress
 import json
 import mimetypes
 import os
+import secrets
 import sqlite3
 import sys
 import threading
 import time
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -38,9 +42,48 @@ DB_PATH = os.environ.get("IPAM_DB_PATH", os.path.join(DATA_DIR, "ipam.db"))
 db_lock = threading.Lock()
 
 
+def _hash_password(password: str, salt: str = "") -> tuple:
+    """Hache un mot de passe avec PBKDF2-HMAC-SHA256 (200 000 itérations)."""
+    if not salt:
+        salt = secrets.token_hex(16)
+    pwd_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        200_000,
+    ).hex()
+    return pwd_hash, salt
+
+
+def _verify_password(password: str, stored_hash: str, salt: str) -> bool:
+    cand_hash, _ = _hash_password(password, salt)
+    return hmac.compare_digest(cand_hash, stored_hash)
+
+
 def init_db():
-    """Initialise la base de données SQLite pour l'IPAM et l'historique des scans."""
+    """Initialise la base de données SQLite pour l'IPAM, l'historique et l'authentification."""
     with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                role TEXT DEFAULT 'admin',
+                created_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                created_at TEXT
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS subnets (
@@ -103,6 +146,28 @@ def init_db():
             )
             """
         )
+
+        # Création automatique du compte administrateur par défaut si aucun utilisateur n'existe
+        user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        admin_user = os.environ.get("IPAM_ADMIN_USER", "admin").strip() or "admin"
+        admin_pass = os.environ.get("IPAM_ADMIN_PASSWORD", "admin123")
+        force_reset = os.environ.get("IPAM_FORCE_ENV_PASSWORD", "0") == "1"
+
+        if user_count == 0 or force_reset:
+            pwd_hash, salt = _hash_password(admin_pass)
+            conn.execute(
+                """
+                INSERT INTO users (username, password_hash, salt, role, created_at)
+                VALUES (?, ?, ?, 'admin', ?)
+                ON CONFLICT(username) DO UPDATE SET
+                    password_hash = excluded.password_hash,
+                    salt = excluded.salt
+                """,
+                (admin_user, pwd_hash, salt, time.strftime("%Y-%m-%d %H:%M:%S")),
+            )
+
+        # Nettoyage des sessions expirées
+        conn.execute("DELETE FROM sessions WHERE expires_at < ?", (int(time.time()),))
         conn.commit()
 
 
@@ -867,17 +932,20 @@ scanner_manager = NetworkScannerManager(on_scan_complete=save_scan_results)
 
 
 class IPAMRequestHandler(BaseHTTPRequestHandler):
-    """Gestionnaire HTTP pour l'API IPAM et les fichiers statiques."""
+    """Gestionnaire HTTP pour l'API IPAM, l'authentification et les fichiers statiques."""
 
     def log_message(self, format, *args):
         pass
 
-    def _send_json(self, data: dict, status: int = 200):
+    def _send_json(self, data: dict, status: int = 200, extra_headers: list = None):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        if extra_headers:
+            for k, v in extra_headers:
+                self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
@@ -888,12 +956,95 @@ class IPAMRequestHandler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length).decode("utf-8")
         return json.loads(raw) if raw else {}
 
+    def _get_session_token(self) -> str:
+        cookie_hdr = self.headers.get("Cookie", "")
+        if not cookie_hdr:
+            return ""
+        c = SimpleCookie()
+        try:
+            c.load(cookie_hdr)
+            if "netpulse_session" in c:
+                return c["netpulse_session"].value
+        except Exception:
+            pass
+        return ""
+
+    def _get_authenticated_user(self) -> str:
+        """Retourne le nom d'utilisateur si le cookie de session est valide, sinon ''."""
+        if os.environ.get("IPAM_DISABLE_AUTH", "0") == "1":
+            return "admin"
+        token = self._get_session_token()
+        if not token:
+            return ""
+        now_ts = int(time.time())
+        with db_lock, sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT username FROM sessions WHERE token = ? AND expires_at > ?",
+                (token, now_ts),
+            ).fetchone()
+            return row[0] if row else ""
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
 
         try:
+            # Routes publiques nécessaires à l'écran de connexion
+            if path == "/login":
+                if self._get_authenticated_user():
+                    self.send_response(302)
+                    self.send_header("Location", "/")
+                    self.end_headers()
+                    return
+                login_file = os.path.join(STATIC_DIR, "login.html")
+                with open(login_file, "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(content)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(content)
+                return
+
+            if path == "/styles.css":
+                css_file = os.path.join(STATIC_DIR, "styles.css")
+                with open(css_file, "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/css; charset=utf-8")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+                return
+
+            # Vérification de l'authentification pour tout le reste
+            current_user = self._get_authenticated_user()
+            if not current_user:
+                if path.startswith("/api/"):
+                    self._send_json(
+                        {"ok": False, "error": "Session expirée ou non authentifiée.", "auth_required": True},
+                        status=401,
+                    )
+                else:
+                    self.send_response(302)
+                    self.send_header("Location", "/login")
+                    self.end_headers()
+                return
+
+            if path == "/api/auth/me":
+                with db_lock, sqlite3.connect(DB_PATH) as conn:
+                    conn.row_factory = sqlite3.Row
+                    users_list = [
+                        dict(r)
+                        for r in conn.execute(
+                            "SELECT username, role, created_at FROM users ORDER BY username ASC"
+                        ).fetchall()
+                    ]
+                self._send_json({"ok": True, "username": current_user, "users": users_list})
+                return
+
             if path == "/api/interfaces":
                 interfaces = get_local_interfaces()
                 with db_lock, sqlite3.connect(DB_PATH) as conn:
@@ -1052,6 +1203,121 @@ class IPAMRequestHandler(BaseHTTPRequestHandler):
 
         try:
             body = self._read_json_body()
+
+            # 1. Route publique de connexion
+            if path == "/api/auth/login":
+                username = body.get("username", "").strip()
+                password = body.get("password", "")
+                remember = bool(body.get("remember", True))
+
+                if not username or not password:
+                    self._send_json({"ok": False, "error": "Veuillez saisir votre identifiant et mot de passe."}, status=400)
+                    return
+
+                with db_lock, sqlite3.connect(DB_PATH) as conn:
+                    conn.row_factory = sqlite3.Row
+                    user_row = conn.execute(
+                        "SELECT * FROM users WHERE username = ?", (username,)
+                    ).fetchone()
+
+                    if not user_row or not _verify_password(password, user_row["password_hash"], user_row["salt"]):
+                        self._send_json({"ok": False, "error": "Identifiant ou mot de passe incorrect."}, status=401)
+                        return
+
+                    token = secrets.token_hex(32)
+                    max_age = 7 * 86400 if remember else 12 * 3600
+                    expires_at = int(time.time()) + max_age
+                    conn.execute(
+                        "INSERT INTO sessions (token, username, expires_at, created_at) VALUES (?, ?, ?, ?)",
+                        (token, username, expires_at, time.strftime("%Y-%m-%d %H:%M:%S")),
+                    )
+                    conn.commit()
+
+                cookie_val = f"netpulse_session={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}"
+                self._send_json(
+                    {"ok": True, "username": username},
+                    status=200,
+                    extra_headers=[("Set-Cookie", cookie_val)],
+                )
+                return
+
+            # 2. Déconnexion
+            if path == "/api/auth/logout":
+                token = self._get_session_token()
+                if token:
+                    with db_lock, sqlite3.connect(DB_PATH) as conn:
+                        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+                        conn.commit()
+                clear_cookie = "netpulse_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+                self._send_json({"ok": True}, extra_headers=[("Set-Cookie", clear_cookie)])
+                return
+
+            # 3. Toutes les autres routes POST exigent une session valide
+            current_user = self._get_authenticated_user()
+            if not current_user:
+                self._send_json(
+                    {"ok": False, "error": "Session expirée ou non authentifiée.", "auth_required": True},
+                    status=401,
+                )
+                return
+
+            if path == "/api/auth/change-password":
+                current_pwd = body.get("current_password", "")
+                new_pwd = body.get("new_password", "")
+                if len(new_pwd) < 4:
+                    self._send_json({"ok": False, "error": "Le nouveau mot de passe doit contenir au moins 4 caractères."}, status=400)
+                    return
+
+                with db_lock, sqlite3.connect(DB_PATH) as conn:
+                    conn.row_factory = sqlite3.Row
+                    u = conn.execute("SELECT * FROM users WHERE username = ?", (current_user,)).fetchone()
+                    if not u or not _verify_password(current_pwd, u["password_hash"], u["salt"]):
+                        self._send_json({"ok": False, "error": "Le mot de passe actuel est incorrect."}, status=400)
+                        return
+                    new_hash, new_salt = _hash_password(new_pwd)
+                    conn.execute(
+                        "UPDATE users SET password_hash = ?, salt = ? WHERE username = ?",
+                        (new_hash, new_salt, current_user),
+                    )
+                    conn.commit()
+                self._send_json({"ok": True})
+                return
+
+            if path == "/api/auth/user/create":
+                new_user = body.get("username", "").strip()
+                new_pwd = body.get("password", "")
+                if not new_user or len(new_pwd) < 4:
+                    self._send_json({"ok": False, "error": "Identifiant requis et mot de passe d'au moins 4 caractères."}, status=400)
+                    return
+                pwd_hash, salt = _hash_password(new_pwd)
+                with db_lock, sqlite3.connect(DB_PATH) as conn:
+                    existing = conn.execute("SELECT 1 FROM users WHERE username = ?", (new_user,)).fetchone()
+                    if existing:
+                        self._send_json({"ok": False, "error": f"L'utilisateur '{new_user}' existe déjà."}, status=400)
+                        return
+                    conn.execute(
+                        "INSERT INTO users (username, password_hash, salt, role, created_at) VALUES (?, ?, ?, 'admin', ?)",
+                        (new_user, pwd_hash, salt, time.strftime("%Y-%m-%d %H:%M:%S")),
+                    )
+                    conn.row_factory = sqlite3.Row
+                    users_list = [dict(r) for r in conn.execute("SELECT username, role, created_at FROM users ORDER BY username ASC").fetchall()]
+                    conn.commit()
+                self._send_json({"ok": True, "users": users_list})
+                return
+
+            if path == "/api/auth/user/delete":
+                target_user = body.get("username", "").strip()
+                if target_user == current_user:
+                    self._send_json({"ok": False, "error": "Vous ne pouvez pas supprimer votre propre compte actif."}, status=400)
+                    return
+                with db_lock, sqlite3.connect(DB_PATH) as conn:
+                    conn.execute("DELETE FROM users WHERE username = ?", (target_user,))
+                    conn.execute("DELETE FROM sessions WHERE username = ?", (target_user,))
+                    conn.row_factory = sqlite3.Row
+                    users_list = [dict(r) for r in conn.execute("SELECT username, role, created_at FROM users ORDER BY username ASC").fetchall()]
+                    conn.commit()
+                self._send_json({"ok": True, "users": users_list})
+                return
 
             if path == "/api/scan":
                 network_ip = body.get("network", "").strip()
