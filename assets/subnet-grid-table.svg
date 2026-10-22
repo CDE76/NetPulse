@@ -1,0 +1,267 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="100%" height="100%">
+  <rect width="1200" height="620" rx="14" fill="#0b0f19" stroke="#24324b" stroke-width="2"/>
+
+  <!-- Section 2: Visual Subnet Grid Card -->
+  <g transform="translate(24, 20)">
+    <rect x="0" y="0" width="1152" height="225" rx="14" fill="#111827" stroke="#24324b" stroke-width="1.5"/>
+
+    <text x="24" y="32" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#f1f5f9">
+      2. Cartographie Visuelle du Sous-Réseau (192.168.1.0/24 — Masque 255.255.255.0)
+    </text>
+    <text x="24" y="50" font-family="Segoe UI, sans-serif" font-size="12" fill="#94a3b8">
+      Cliquez sur n'importe quelle case IPv4 pour inspecter ses détails (DNS, MAC, Ports) ou modifier/réserver l'adresse.
+    </text>
+
+    <!-- Legend -->
+    <g transform="translate(550, 22)">
+      <rect x="0" y="0" width="12" height="12" rx="3" fill="#064e3b" stroke="#10b981"/>
+      <text x="18" y="10" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Utilisée (En ligne)</text>
+
+      <rect x="122" y="0" width="12" height="12" rx="3" fill="#2e1065" stroke="#a78bfa"/>
+      <text x="140" y="10" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Serveur / Passerelle</text>
+
+      <circle cx="262" cy="6" r="4" fill="#38bdf8"/>
+      <text x="272" y="10" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Nom DNS résolu</text>
+
+      <rect x="370" y="0" width="12" height="12" rx="3" fill="#451a03" stroke="#f59e0b"/>
+      <text x="388" y="10" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Réservée / Hors-ligne</text>
+
+      <rect x="512" y="0" width="12" height="12" rx="3" fill="#141d2e" stroke="#233047"/>
+      <text x="530" y="10" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Libre</text>
+    </g>
+
+    <!-- Grid Matrix Rows (18 cells per row, 3 rows shown) -->
+    <g transform="translate(24, 68)">
+      <!-- Row 1: .0 to .17 -->
+      <rect x="0" y="0" width="56" height="42" rx="6" fill="#0a0f18" stroke="#334155" stroke-dasharray="3,2"/>
+      <text x="28" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#475569">.0</text>
+
+      <rect x="62" y="0" width="56" height="42" rx="6" fill="#2e1065" stroke="#a78bfa"/>
+      <circle cx="110" cy="7" r="3" fill="#38bdf8"/>
+      <text x="90" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#f5f3ff">.1</text>
+      <text x="90" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#c4b5fd">gw-fw01</text>
+
+      <rect x="124" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="172" cy="7" r="3" fill="#38bdf8"/>
+      <text x="152" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.2</text>
+      <text x="152" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">srv-dc01</text>
+
+      <rect x="186" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="234" cy="7" r="3" fill="#38bdf8"/>
+      <text x="214" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.3</text>
+      <text x="214" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">srv-dc02</text>
+
+      <rect x="248" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="296" cy="7" r="3" fill="#38bdf8"/>
+      <text x="276" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.4</text>
+      <text x="276" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">pve-node1</text>
+
+      <rect x="310" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="358" cy="7" r="3" fill="#38bdf8"/>
+      <text x="338" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.5</text>
+      <text x="338" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">synology</text>
+
+      <rect x="372" y="0" width="56" height="42" rx="6" fill="#451a03" stroke="#f59e0b"/>
+      <circle cx="420" cy="7" r="3" fill="#38bdf8"/>
+      <text x="400" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#fef3c7">.6</text>
+      <text x="400" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#fcd34d">vip-k8s</text>
+
+      <rect x="434" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+      <text x="462" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.7</text>
+
+      <rect x="496" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+      <text x="524" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.8</text>
+
+      <rect x="558" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="606" cy="7" r="3" fill="#38bdf8"/>
+      <text x="586" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.9</text>
+      <text x="586" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">sw-core</text>
+
+      <rect x="620" y="0" width="56" height="42" rx="6" fill="#2e1065" stroke="#a78bfa"/>
+      <circle cx="668" cy="7" r="3" fill="#38bdf8"/>
+      <text x="648" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#f5f3ff">.10</text>
+      <text x="648" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#c4b5fd">ipam-srv</text>
+
+      <rect x="682" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="730" cy="7" r="3" fill="#38bdf8"/>
+      <text x="710" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.11</text>
+      <text x="710" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">portainer</text>
+
+      <rect x="744" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+      <text x="772" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.12</text>
+
+      <rect x="806" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+      <text x="834" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.13</text>
+
+      <rect x="868" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="916" cy="7" r="3" fill="#38bdf8"/>
+      <text x="896" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.14</text>
+      <text x="896" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">ap-unifi</text>
+
+      <rect x="930" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+      <circle cx="978" cy="7" r="3" fill="#38bdf8"/>
+      <text x="958" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.15</text>
+      <text x="958" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">prn-hp</text>
+
+      <rect x="992" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+      <text x="1020" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.16</text>
+
+      <rect x="1054" y="0" width="50" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+      <text x="1079" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.17</text>
+
+      <!-- Row 2: .18 to .35 -->
+      <g transform="translate(0, 50)">
+        <rect x="0" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+        <text x="28" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.18</text>
+
+        <rect x="62" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+        <text x="90" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.19</text>
+
+        <rect x="124" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+        <circle cx="172" cy="7" r="3" fill="#38bdf8"/>
+        <text x="152" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.20</text>
+        <text x="152" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">pc-admin</text>
+
+        <rect x="186" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+        <circle cx="234" cy="7" r="3" fill="#38bdf8"/>
+        <text x="214" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.21</text>
+        <text x="214" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">pc-dev01</text>
+
+        <rect x="248" y="0" width="56" height="42" rx="6" fill="#451a03" stroke="#f59e0b"/>
+        <circle cx="296" cy="7" r="3" fill="#38bdf8"/>
+        <text x="276" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#fef3c7">.22</text>
+        <text x="276" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#fcd34d">pc-compta</text>
+
+        <rect x="310" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+        <text x="338" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.23</text>
+
+        <rect x="372" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+        <text x="400" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">.24</text>
+
+        <rect x="434" y="0" width="56" height="42" rx="6" fill="#064e3b" stroke="#10b981"/>
+        <circle cx="482" cy="7" r="3" fill="#38bdf8"/>
+        <text x="462" y="19" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#ecfdf5">.25</text>
+        <text x="462" y="34" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="9" fill="#6ee7b7">rpi-domo</text>
+
+        <rect x="496" y="0" width="56" height="42" rx="6" fill="#141d2e" stroke="#233047"/>
+        <text x="524" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11.5" fill="#64748b">...</text>
+
+        <rect x="1054" y="0" width="50" height="42" rx="6" fill="#0a0f18" stroke="#334155" stroke-dasharray="3,2"/>
+        <text x="1079" y="25" text-anchor="middle" font-family="Consolas, monospace" font-size="11" font-weight="700" fill="#475569">.255</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Section 3: Detailed IPAM Table Card -->
+  <g transform="translate(24, 262)">
+    <rect x="0" y="0" width="1152" height="338" rx="14" fill="#111827" stroke="#24324b" stroke-width="1.5"/>
+
+    <text x="24" y="32" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#f1f5f9">
+      3. Inventaire IPAM Détaillé — Adresses IPv4 &amp; Noms DNS
+    </text>
+
+    <!-- Filter Tabs & Search -->
+    <g transform="translate(420, 14)">
+      <rect x="0" y="0" width="465" height="32" rx="6" fill="#0d1424" stroke="#24324b"/>
+      <rect x="4" y="4" width="120" height="24" rx="4" fill="#3b82f6"/>
+      <text x="64" y="20" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#fff">IPv4 Utilisées (42)</text>
+      <text x="180" y="20" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#94a3b8">Avec Nom DNS (38)</text>
+      <text x="305" y="20" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#94a3b8">Utilisées + Réservées</text>
+      <text x="418" y="20" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#94a3b8">Tout (256)</text>
+
+      <rect x="476" y="0" width="232" height="32" rx="6" fill="#0d1424" stroke="#24324b"/>
+      <text x="490" y="20" font-family="Segoe UI, sans-serif" font-size="11" fill="#64748b">🔍 Rechercher IP, DNS, MAC, Port...</text>
+    </g>
+
+    <!-- Table Header -->
+    <g transform="translate(0, 62)">
+      <rect x="1" y="0" width="1150" height="34" fill="#0d1424"/>
+      <line x1="1" y1="34" x2="1151" y2="34" stroke="#24324b"/>
+      <text x="24" y="21" font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">ADRESSE IPv4</text>
+      <text x="145" y="21" font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">STATUT</text>
+      <text x="295" y="21" font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">NOM DNS (PTR / HOSTNAME)</text>
+      <text x="505" y="21" font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">ADRESSE MAC &amp; CONSTRUCTEUR</text>
+      <text x="710" y="21" font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">LATENCE &amp; OS</text>
+      <text x="840" y="21" font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">PORTS TCP OUVERTS</text>
+      <text x="1055" y="21" font-family="Segoe UI, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">ACTION</text>
+
+      <!-- Row 1 -->
+      <g transform="translate(0, 35)">
+        <line x1="1" y1="54" x2="1151" y2="54" stroke="#1e293b"/>
+        <text x="24" y="32" font-family="Consolas, monospace" font-size="13" font-weight="700" fill="#60a5fa">192.168.1.1</text>
+        <rect x="145" y="16" width="110" height="22" rx="11" fill="#2e1065" stroke="#8b5cf6"/>
+        <text x="200" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#c4b5fd">● Passerelle</text>
+        <text x="295" y="25" font-family="Consolas, monospace" font-size="12.5" font-weight="700" fill="#38bdf8">gw-fortigate.corp.lan</text>
+        <text x="295" y="42" font-family="Segoe UI, sans-serif" font-size="11" fill="#a78bfa">Alias: FW-CORE-01</text>
+        <text x="505" y="25" font-family="Consolas, monospace" font-size="12" fill="#f1f5f9">90:6C:AC:14:8B:01</text>
+        <text x="505" y="42" font-family="Segoe UI, sans-serif" font-size="11" fill="#94a3b8">Fortinet Inc.</text>
+        <text x="710" y="25" font-family="Consolas, monospace" font-size="12" font-weight="700" fill="#34d399">0.7 ms</text>
+        <text x="710" y="42" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#94a3b8">Linux / Network OS</text>
+        <rect x="840" y="16" width="52" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="866" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">53/DNS</text>
+        <rect x="898" y="16" width="64" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="930" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">443/HTTPS</text>
+        <rect x="1038" y="14" width="92" height="26" rx="5" fill="none" stroke="#334155"/>
+        <text x="1084" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Détails / Éditer</text>
+      </g>
+
+      <!-- Row 2 -->
+      <g transform="translate(0, 90)">
+        <line x1="1" y1="54" x2="1151" y2="54" stroke="#1e293b"/>
+        <text x="24" y="32" font-family="Consolas, monospace" font-size="13" font-weight="700" fill="#60a5fa">192.168.1.2</text>
+        <rect x="145" y="16" width="130" height="22" rx="11" fill="#064e3b" stroke="#10b981"/>
+        <text x="210" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#34d399">● En ligne (Utilisée)</text>
+        <text x="295" y="25" font-family="Consolas, monospace" font-size="12.5" font-weight="700" fill="#38bdf8">srv-dc01.corp.lan</text>
+        <text x="295" y="42" font-family="Segoe UI, sans-serif" font-size="11" fill="#a78bfa">Alias: Active Directory Principal</text>
+        <text x="505" y="25" font-family="Consolas, monospace" font-size="12" fill="#f1f5f9">00:50:56:8A:32:10</text>
+        <text x="505" y="42" font-family="Segoe UI, sans-serif" font-size="11" fill="#94a3b8">VMware</text>
+        <text x="710" y="25" font-family="Consolas, monospace" font-size="12" font-weight="700" fill="#34d399">1.1 ms</text>
+        <text x="710" y="42" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#94a3b8">Windows (TTL ~128)</text>
+        <rect x="840" y="16" width="52" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="866" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">53/DNS</text>
+        <rect x="898" y="16" width="56" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="926" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">445/SMB</text>
+        <rect x="960" y="16" width="60" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="990" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">3389/RDP</text>
+        <rect x="1038" y="14" width="92" height="26" rx="5" fill="none" stroke="#334155"/>
+        <text x="1084" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Détails / Éditer</text>
+      </g>
+
+      <!-- Row 3 -->
+      <g transform="translate(0, 145)">
+        <line x1="1" y1="54" x2="1151" y2="54" stroke="#1e293b"/>
+        <text x="24" y="32" font-family="Consolas, monospace" font-size="13" font-weight="700" fill="#60a5fa">192.168.1.5</text>
+        <rect x="145" y="16" width="130" height="22" rx="11" fill="#064e3b" stroke="#10b981"/>
+        <text x="210" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#34d399">● En ligne (Utilisée)</text>
+        <text x="295" y="25" font-family="Consolas, monospace" font-size="12.5" font-weight="700" fill="#38bdf8">nas-synology-rs1221.corp.lan</text>
+        <text x="295" y="42" font-family="Segoe UI, sans-serif" font-size="11" fill="#a78bfa">Alias: NAS Sauvegardes Veeam</text>
+        <text x="505" y="25" font-family="Consolas, monospace" font-size="12" fill="#f1f5f9">00:11:32:9F:41:C8</text>
+        <text x="505" y="42" font-family="Segoe UI, sans-serif" font-size="11" fill="#94a3b8">Synology Inc</text>
+        <text x="710" y="25" font-family="Consolas, monospace" font-size="12" font-weight="700" fill="#34d399">0.9 ms</text>
+        <text x="710" y="42" font-family="Segoe UI, sans-serif" font-size="10.5" fill="#94a3b8">Linux / Unix (TTL ~64)</text>
+        <rect x="840" y="16" width="52" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="866" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">22/SSH</text>
+        <rect x="898" y="16" width="64" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="930" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">443/HTTPS</text>
+        <rect x="968" y="16" width="56" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+        <text x="996" y="30" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#93c5fd">445/SMB</text>
+        <rect x="1038" y="14" width="92" height="26" rx="5" fill="none" stroke="#334155"/>
+        <text x="1084" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Détails / Éditer</text>
+      </g>
+
+      <!-- Row 4 -->
+      <g transform="translate(0, 200)">
+        <text x="24" y="32" font-family="Consolas, monospace" font-size="13" font-weight="700" fill="#60a5fa">192.168.1.6</text>
+        <rect x="145" y="16" width="102" height="22" rx="11" fill="#451a03" stroke="#f59e0b"/>
+        <text x="196" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#fbbf24">◆ Réservée</text>
+        <text x="295" y="25" font-family="Consolas, monospace" font-size="12.5" font-weight="700" fill="#38bdf8">vip-cluster-k8s.corp.lan</text>
+        <text x="295" y="42" font-family="Segoe UI, sans-serif" font-size="11" fill="#a78bfa">Alias: VIP LoadBalancer</text>
+        <text x="505" y="30" font-family="Consolas, monospace" font-size="12" fill="#64748b">—</text>
+        <text x="710" y="30" font-family="Segoe UI, sans-serif" font-size="11" fill="#94a3b8">Réservation Statique</text>
+        <text x="840" y="30" font-family="Segoe UI, sans-serif" font-size="11" fill="#64748b">—</text>
+        <rect x="1038" y="14" width="92" height="26" rx="5" fill="none" stroke="#334155"/>
+        <text x="1084" y="31" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#cbd5e1">Détails / Éditer</text>
+      </g>
+    </g>
+  </g>
+</svg>
