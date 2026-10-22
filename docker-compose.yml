@@ -1,0 +1,23 @@
+services:
+  netpulse-ipam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: netpulse-ipam
+    restart: unless-stopped
+    # network_mode: host permet au conteneur d'accéder directement au réseau local (LAN),
+    # aux interfaces de l'hôte et à la table ARP réelle pour détecter les adresses MAC.
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    environment:
+      - PORT=${PORT:-8080}
+      - IPAM_DATA_DIR=/data
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - ipam_data:/data
+
+volumes:
+  ipam_data:
+    driver: local

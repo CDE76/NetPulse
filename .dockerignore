@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*.db
+.git/
+.gitignore
+README.md
+start_ipam.bat

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetPulse IPAM — Scanner Réseau Local & Gestion IPv4</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Header Principal -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="6" rx="1.5"></rect>
+          <rect x="2" y="13" width="20" height="6" rx="1.5"></rect>
+          <circle cx="6" cy="6" r="1" fill="currentColor"></circle>
+          <circle cx="6" cy="16" r="1" fill="currentColor"></circle>
+          <path d="M10 6h8M10 16h8M12 19v3M8 22h8"></path>
+        </svg>
+      </div>
+      <div>
+        <h1>NetPulse <span class="badge-accent">IPAM</span></h1>
+        <p class="subtitle">Scanner Réseau Local IPv4, Résolution DNS, Sauvegardes, Import/Export CSV & Rapport PDF</p>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <!-- Générer PDF Récap des IPs utilisées -->
+      <button id="btnExportPdf" class="btn btn-pdf" title="Télécharger un rapport PDF récapitulatif des adresses IPv4 utilisées">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        Générer PDF (IPs Utilisées)
+      </button>
+
+      <!-- Ré-importer un plan complet exporté précédemment -->
+      <button id="btnOpenImportModal" class="btn btn-secondary" title="Ré-importer un plan d'adressage CSV exporté précédemment pour le modifier">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Ré-importer un Plan (CSV)
+      </button>
+
+      <!-- Accès rapide aux anciens scans & sauvegardes -->
+      <button id="btnOpenHistoryModal" class="btn btn-secondary" title="Consulter, sauvegarder ou restaurer d'anciens scans">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        Anciens Scans (<span id="headerHistoryCount">0</span>)
+      </button>
+
+      <!-- Exports CSV -->
+      <button id="btnExportUsedCsv" class="btn btn-outline" title="Exporter uniquement les adresses IPv4 utilisées en CSV">
+        Exporter IPs Utilisées (CSV)
+      </button>
+      <button id="btnExportAllCsv" class="btn btn-outline" title="Exporter tout le plan d'adressage du sous-réseau en CSV">
+        Exporter Plan Complet (CSV)
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Section 1 : Sélection manuelle du Réseau, Sous-réseau et Masque -->
+    <section class="card config-card">
+      <div class="card-header">
+        <div>
+          <h2>1. Configuration du Réseau & Masque de Sous-Réseau</h2>
+          <p class="text-muted">Saisissez manuellement le réseau/sous-réseau et choisissez le masque, ou cliquez sur une interface locale détectée.</p>
+        </div>
+        <div id="localInterfacesWrap" class="interfaces-pills">
+          <span class="pill-label">Interfaces du serveur :</span>
+          <div id="interfacesList" class="pills-row">
+            <span class="text-muted">Détection en cours...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barre d'historique des sous-réseaux scannés -->
+      <div id="savedSubnetsBar" class="saved-subnets-bar hidden">
+        <span class="pill-label">Sous-réseaux connus :</span>
+        <div id="savedSubnetsList" class="pills-row"></div>
+      </div>
+
+      <form id="scanForm" class="scan-form">
+        <div class="form-grid">
+          <!-- Adresse Réseau / Sous-réseau -->
+          <div class="form-group">
+            <label for="inputNetwork">Adresse Réseau / Sous-réseau IPv4</label>
+            <div class="input-with-icon">
+              <input
+                type="text"
+                id="inputNetwork"
+                placeholder="ex: 192.168.1.0 ou 10.0.0.0"
+                value="192.168.1.0"
+                required
+                autocomplete="off"
+              />
+            </div>
+            <small class="field-hint">Saisissez l'IP du réseau ou n'importe quelle IP appartenant au sous-réseau</small>
+          </div>
+
+          <!-- Sélecteur de Masque prédéfini (CIDR + Décimal) -->
+          <div class="form-group">
+            <label for="selectMaskPreset">Choix du Masque de Sous-Réseau (CIDR)</label>
+            <select id="selectMaskPreset">
+              <option value="255.255.0.0">/16 — 255.255.0.0 (65534 hôtes)</option>
+              <option value="255.255.128.0">/17 — 255.255.128.0 (32766 hôtes)</option>
+              <option value="255.255.192.0">/18 — 255.255.192.0 (16382 hôtes)</option>
+              <option value="255.255.224.0">/19 — 255.255.224.0 (8190 hôtes)</option>
+              <option value="255.255.240.0">/20 — 255.255.240.0 (4094 hôtes)</option>
+              <option value="255.255.248.0">/21 — 255.255.248.0 (2046 hôtes)</option>
+              <option value="255.255.252.0">/22 — 255.255.252.0 (1022 hôtes)</option>
+              <option value="255.255.254.0">/23 — 255.255.254.0 (510 hôtes)</option>
+              <option value="255.255.255.0" selected>/24 — 255.255.255.0 (254 hôtes)</option>
+              <option value="255.255.255.128">/25 — 255.255.255.128 (126 hôtes)</option>
+              <option value="255.255.255.192">/26 — 255.255.255.192 (62 hôtes)</option>
+              <option value="255.255.255.224">/27 — 255.255.255.224 (30 hôtes)</option>
+              <option value="255.255.255.240">/28 — 255.255.255.240 (14 hôtes)</option>
+              <option value="255.255.255.248">/29 — 255.255.255.248 (6 hôtes)</option>
+              <option value="255.255.255.252">/30 — 255.255.255.252 (2 hôtes)</option>
+              <option value="255.255.255.255">/32 — 255.255.255.255 (1 hôte unique)</option>
+            </select>
+            <small class="field-hint">Sélection rapide de la taille du sous-réseau</small>
+          </div>
+
+          <!-- Saisie manuelle du Masque (Décimal pointé ou /CIDR) -->
+          <div class="form-group">
+            <label for="inputMaskCustom">Masque de Sous-Réseau (Manuel / Décimal)</label>
+            <input
+              type="text"
+              id="inputMaskCustom"
+              placeholder="ex: 255.255.255.0 ou /24"
+              value="255.255.255.0"
+              required
+              autocomplete="off"
+            />
+            <small class="field-hint">Modifiable manuellement (ex: <code>255.255.255.128</code> ou <code>/25</code>)</small>
+          </div>
+
+          <!-- Options de scan -->
+          <div class="form-group">
+            <label for="selectTimeout">Options d'analyse</label>
+            <div class="scan-options-box">
+              <label class="checkbox-label" title="Résoudre les noms d'hôtes via DNS inverse (PTR), FQDN et NetBIOS">
+                <input type="checkbox" id="chkResolveDns" checked />
+                <span>Noms DNS (PTR / Hostname)</span>
+              </label>
+              <label class="checkbox-label" title="Scanner les ports TCP courants : 22 (SSH), 53 (DNS), 80 (HTTP), 443 (HTTPS), 445 (SMB), 3389 (RDP)...">
+                <input type="checkbox" id="chkScanPorts" checked />
+                <span>Ports TCP & Latence</span>
+              </label>
+              <div class="timeout-inline">
+                <span>Timeout Ping :</span>
+                <select id="selectTimeout">
+                  <option value="250">Rapide (250 ms)</option>
+                  <option value="450" selected>Standard (450 ms)</option>
+                  <option value="800">Approfondi (800 ms)</option>
+                  <option value="1200">Lent / VPN (1200 ms)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Calculateur de sous-réseau en direct -->
+        <div id="subnetCalcBanner" class="subnet-calc-banner">
+          <div class="calc-item">
+            <span class="calc-label">Sous-réseau CIDR</span>
+            <strong id="calcCidr" class="mono">192.168.1.0/24</strong>
+          </div>
+          <div class="calc-item">
+            <span class="calc-label">Adresse Réseau</span>
+            <strong id="calcNetAddr" class="mono">192.168.1.0</strong>
+          </div>
+          <div class="calc-item">
+            <span class="calc-label">Masque Décimal</span>
+            <strong id="calcNetmask" class="mono">255.255.255.0</strong>
+          </div>
+          <div class="calc-item">
+            <span class="calc-label">Plage d'Hôtes Utilisables</span>
+            <strong id="calcRange" class="mono">192.168.1.1 → 192.168.1.254</strong>
+          </div>
+          <div class="calc-item">
+            <span class="calc-label">Adresse Broadcast</span>
+            <strong id="calcBroadcast" class="mono">192.168.1.255</strong>
+          </div>
+          <div class="calc-item">
+            <span class="calc-label">Capacité Hôtes</span>
+            <strong id="calcUsable" class="badge-capacity">254 IPs</strong>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="btnStartScan" class="btn btn-primary btn-lg">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 12L17 7"></path>
+              <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+            </svg>
+            <span>Scanner ce Sous-Réseau Maintenant</span>
+          </button>
+          <button type="button" id="btnLoadSubnet" class="btn btn-outline">
+            Afficher le Plan IPAM sans scanner
+          </button>
+          <button type="button" id="btnQuickSaveSnapshot" class="btn btn-secondary" title="Créer une sauvegarde nommée de l'état actuel de ce sous-réseau">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Sauvegarder l'état actuel
+          </button>
+        </div>
+      </form>
+
+      <!-- Barre de progression en temps réel pendant le scan -->
+      <div id="scanProgressPanel" class="scan-progress-panel hidden">
+        <div class="progress-header">
+          <div class="progress-title">
+            <span class="spinner"></span>
+            <strong id="progressPhase">Scan réseau en cours...</strong>
+          </div>
+          <div class="progress-stats mono">
+            <span id="progressCounter">0 / 254 IPs</span>
+            <span class="sep">•</span>
+            <span id="progressActiveFound" class="text-success">0 actives</span>
+            <span class="sep">•</span>
+            <span id="progressDnsFound" class="text-accent">0 DNS</span>
+            <span class="sep">•</span>
+            <span id="progressElapsed">0.0s</span>
+          </div>
+        </div>
+        <div class="progress-bar-track">
+          <div id="progressBarFill" class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2 : Cartes KPI du Sous-Réseau -->
+    <section class="kpi-grid">
+      <div class="kpi-card kpi-active">
+        <div class="kpi-top">
+          <span class="kpi-label">Adresses IPv4 Utilisées (En Ligne)</span>
+          <span class="kpi-dot dot-active"></span>
+        </div>
+        <div class="kpi-value-row">
+          <strong id="kpiOnlineCount" class="kpi-value">0</strong>
+          <span id="kpiUtilizationPct" class="kpi-badge">0% du sous-réseau</span>
+        </div>
+        <div class="mini-progress">
+          <div id="kpiUtilizationBar" class="mini-progress-fill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-dns">
+        <div class="kpi-top">
+          <span class="kpi-label">Hôtes avec Nom DNS Résolu</span>
+          <span class="kpi-dot dot-dns"></span>
+        </div>
+        <div class="kpi-value-row">
+          <strong id="kpiDnsCount" class="kpi-value">0</strong>
+          <span id="kpiDnsRatio" class="kpi-sub">PTR / Hostname / NetBIOS</span>
+        </div>
+        <p class="kpi-foot">Résolution inverse automatique sur les IPs actives</p>
+      </div>
+
+      <div class="kpi-card kpi-reserved">
+        <div class="kpi-top">
+          <span class="kpi-label">Réservées / Hors-Ligne Connues</span>
+          <span class="kpi-dot dot-reserved"></span>
+        </div>
+        <div class="kpi-value-row">
+          <strong id="kpiReservedCount" class="kpi-value">0</strong>
+          <span class="kpi-sub">Historique & Statiques</span>
+        </div>
+        <p class="kpi-foot">Équipements éteints ou adresses IP réservées</p>
+      </div>
+
+      <div class="kpi-card kpi-free">
+        <div class="kpi-top">
+          <span class="kpi-label">Adresses IPv4 Libres</span>
+          <span class="kpi-dot dot-free"></span>
+        </div>
+        <div class="kpi-value-row">
+          <strong id="kpiFreeCount" class="kpi-value">0</strong>
+          <span id="kpiTotalUsable" class="kpi-sub">sur 254 hôtes</span>
+        </div>
+        <p id="kpiLastScanInfo" class="kpi-foot">Aucun scan effectué sur cette plage</p>
+      </div>
+    </section>
+
+    <!-- Section 3 : Grille Visuelle IPAM (Cartographie du sous-réseau) -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2>2. Cartographie Visuelle du Sous-Réseau (<span id="gridSubnetTitle" class="mono">192.168.1.0/24</span>)</h2>
+          <p class="text-muted">Cliquez sur n'importe quelle case IPv4 pour inspecter ses détails (DNS, MAC, Ports) ou modifier/réserver l'adresse.</p>
+        </div>
+        <div class="grid-legend">
+          <span class="legend-item"><i class="swatch swatch-active"></i> Utilisée (En ligne)</span>
+          <span class="legend-item"><i class="swatch swatch-special"></i> Serveur / Passerelle</span>
+          <span class="legend-item"><i class="swatch swatch-dns"></i> Nom DNS résolu</span>
+          <span class="legend-item"><i class="swatch swatch-reserved"></i> Réservée / Hors-ligne</span>
+          <span class="legend-item"><i class="swatch swatch-free"></i> Libre</span>
+          <span class="legend-item"><i class="swatch swatch-net"></i> Réseau / Broadcast</span>
+        </div>
+      </div>
+
+      <div id="ipGridContainer" class="ip-grid-container">
+        <!-- Généré dynamiquement par app.js -->
+      </div>
+    </section>
+
+    <!-- Section 4 : Tableau IPAM Détaillé (Adresses IPv4 utilisées, DNS, MAC, Ports) -->
+    <section class="card">
+      <div class="card-header table-header-bar">
+        <div>
+          <h2>3. Inventaire IPAM Détaillé — Adresses IPv4 & Noms DNS</h2>
+          <p class="text-muted">Liste complète des adresses IPv4 utilisées avec leur nom DNS, adresse MAC, constructeur, latence et ports ouverts.</p>
+        </div>
+
+        <div class="table-controls">
+          <div class="filter-tabs" id="filterTabs">
+            <button type="button" class="tab-btn active" data-filter="used">
+              IPv4 Utilisées (<span id="tabCountUsed">0</span>)
+            </button>
+            <button type="button" class="tab-btn" data-filter="dns">
+              Avec Nom DNS (<span id="tabCountDns">0</span>)
+            </button>
+            <button type="button" class="tab-btn" data-filter="known">
+              Utilisées + Réservées (<span id="tabCountKnown">0</span>)
+            </button>
+            <button type="button" class="tab-btn" data-filter="free">
+              IPs Libres (<span id="tabCountFree">0</span>)
+            </button>
+            <button type="button" class="tab-btn" data-filter="all">
+              Tout le Sous-Réseau (<span id="tabCountAll">0</span>)
+            </button>
+          </div>
+
+          <div class="search-box">
+            <input
+              type="search"
+              id="inputSearch"
+              placeholder="Rechercher IP, Nom DNS, MAC, Constructeur, Port, Note..."
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="ipam-table">
+          <thead>
+            <tr>
+              <th>Adresse IPv4</th>
+              <th>Statut</th>
+              <th>Nom DNS (PTR / Hostname)</th>
+              <th>Adresse MAC & Constructeur</th>
+              <th>Latence & OS</th>
+              <th>Ports TCP Ouverts</th>
+              <th>Rôle / Notes</th>
+              <th class="text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="ipamTableBody">
+            <tr>
+              <td colspan="8" class="empty-row">Chargement du plan d'adressage IPAM...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal 1 : Inspection & Édition d'une adresse IPv4 -->
+  <div id="ipModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalIpTitle" class="mono">192.168.1.1</h3>
+          <span id="modalStatusBadge" class="status-pill status-active">En ligne</span>
+        </div>
+        <button type="button" id="btnCloseModal" class="btn-icon" aria-label="Fermer">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-info-grid">
+          <div class="info-cell">
+            <span class="info-label">Nom DNS Résolu</span>
+            <strong id="modalDnsVal" class="mono">—</strong>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">Adresse MAC</span>
+            <strong id="modalMacVal" class="mono">—</strong>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">Constructeur (OUI)</span>
+            <strong id="modalVendorVal">—</strong>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">Latence Ping / TTL</span>
+            <strong id="modalPingVal" class="mono">—</strong>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">Méthode de détection</span>
+            <strong id="modalMethodVal">—</strong>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">Dernière activité</span>
+            <strong id="modalLastSeenVal" class="mono">—</strong>
+          </div>
+        </div>
+
+        <div id="modalPortsWrap" class="modal-ports-wrap">
+          <span class="info-label">Ports TCP Ouverts détectés :</span>
+          <div id="modalPortsList" class="ports-badges"></div>
+        </div>
+
+        <hr class="divider" />
+
+        <form id="modalEditForm" class="modal-form">
+          <input type="hidden" id="editIp" />
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="editCustomName">Alias / Nom personnalisé IPAM</label>
+              <input type="text" id="editCustomName" placeholder="ex: SRV-AD-01, Imprimante Compta..." />
+            </div>
+            <div class="form-group">
+              <label for="editDnsName">Nom DNS (Forcer / Compléter)</label>
+              <input type="text" id="editDnsName" placeholder="ex: host.lan" />
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="editStatus">Statut IPAM</label>
+              <select id="editStatus">
+                <option value="active">Actif / Alloué (DHCP ou Statique)</option>
+                <option value="reserved">Réservé (IP Statique / VIP)</option>
+                <option value="offline">Hors-ligne conservé</option>
+                <option value="free">Libérer l'adresse IP</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="editRole">Catégorie / Rôle</label>
+              <input type="text" id="editRole" placeholder="ex: Serveur, Routeur, Imprimante, Poste..." />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editNotes">Notes / Commentaires administrateur</label>
+            <textarea id="editNotes" rows="2" placeholder="Numéro de prise murale, VLAN, responsable, service..."></textarea>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" id="btnCancelModal" class="btn btn-outline">Annuler</button>
+            <button type="submit" class="btn btn-primary">Enregistrer dans l'IPAM</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2 : Historique & Sauvegardes des Anciens Scans -->
+  <div id="historyModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3>Sauvegardes & Historique des Scans Réseau</h3>
+        </div>
+        <button type="button" id="btnCloseHistoryModal" class="btn-icon" aria-label="Fermer">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Formulaire de sauvegarde manuelle de l'état courant -->
+        <form id="saveSnapshotForm" class="snapshot-bar">
+          <input
+            type="text"
+            id="inputSnapshotTitle"
+            placeholder="Nom de la sauvegarde (ex: Audit VLAN Serveurs Octobre)..."
+          />
+          <button type="submit" class="btn btn-primary">
+            Sauvegarder l'état actuel
+          </button>
+        </form>
+
+        <p class="text-muted">
+          Chaque scan réseau et chaque import CSV sont automatiquement archivés ci-dessous. Cliquez sur <strong>"Charger dans l'éditeur"</strong> pour consulter ou modifier un ancien plan d'adressage.
+        </p>
+
+        <div class="table-responsive history-table-wrap">
+          <table class="ipam-table">
+            <thead>
+              <tr>
+                <th>Date & Heure</th>
+                <th>Nom / Type</th>
+                <th>Sous-Réseau</th>
+                <th>IPs Actives</th>
+                <th>Noms DNS</th>
+                <th>Réservées</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <tr>
+                <td colspan="7" class="empty-row">Aucune sauvegarde enregistrée.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3 : Ré-importer un Plan Complet (CSV / JSON) -->
+  <div id="importModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>Ré-importer un Plan d'Adressage (CSV)</h3>
+        </div>
+        <button type="button" id="btnCloseImportModal" class="btn-icon" aria-label="Fermer">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="text-muted">
+          Sélectionnez un fichier <strong>.CSV</strong> exporté précédemment depuis NetPulse IPAM (<em>Plan Complet</em> ou <em>IPs Utilisées</em>). Toutes les adresses, noms DNS, adresses MAC, rôles et notes seront chargés dans l'application web pour que vous puissiez les modifier.
+        </p>
+
+        <form id="importPlanForm" class="modal-form">
+          <div class="form-group">
+            <label for="inputImportFile">Fichier CSV à importer</label>
+            <input type="file" id="inputImportFile" accept=".csv,.txt,.json" required class="file-input" />
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="chkReplaceSubnet" checked />
+              <span>Remplacer les données actuelles du sous-réseau par celles du fichier importé</span>
+            </label>
+          </div>
+
+          <div id="importFilePreview" class="import-preview hidden"></div>
+
+          <div class="modal-footer">
+            <button type="button" id="btnCancelImportModal" class="btn btn-outline">Annuler</button>
+            <button type="submit" id="btnSubmitImport" class="btn btn-primary">
+              Importer et Ouvrir dans l'Éditeur
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast de notification -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
