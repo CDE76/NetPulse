@@ -31,6 +31,8 @@ from scanner import (
     calculate_subnet_info,
     get_local_interfaces,
     parse_network_and_mask,
+    probe_single_host,
+    send_wake_on_lan,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1165,6 +1167,26 @@ class IPAMRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(pdf_bytes)
                 return
 
+            if path == "/api/tools/rdp":
+                ip_target = query.get("ip", [""])[0].strip()
+                ipaddress.IPv4Address(ip_target)
+                rdp_content = (
+                    f"full address:s:{ip_target}:3389\r\n"
+                    "prompt for credentials:i:1\r\n"
+                    "administrative session:i:1\r\n"
+                    "screen mode id:i:2\r\n"
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-rdp")
+                self.send_header(
+                    "Content-Disposition",
+                    f'attachment; filename="RDP_{ip_target}.rdp"',
+                )
+                self.send_header("Content-Length", str(len(rdp_content)))
+                self.end_headers()
+                self.wfile.write(rdp_content)
+                return
+
             # Fichiers statiques
             if path == "/" or path == "":
                 file_path = os.path.join(STATIC_DIR, "index.html")
@@ -1340,11 +1362,93 @@ class IPAMRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "status": status})
                 return
 
+            if path == "/api/tools/wol":
+                mac_str = body.get("mac", "").strip()
+                broadcast_ip = body.get("broadcast", "255.255.255.255").strip()
+                norm_mac = send_wake_on_lan(mac_str, broadcast_ip=broadcast_ip)
+                self._send_json({
+                    "ok": True,
+                    "mac": norm_mac,
+                    "message": f"Paquet magique Wake-on-LAN envoyé à {norm_mac} (Broadcast {broadcast_ip})",
+                })
+                return
+
+            if path == "/api/tools/probe":
+                ip_str = body.get("ip", "").strip()
+                subnet_cidr = body.get("subnet_cidr", "").strip()
+                result = probe_single_host(ip_str)
+                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+
+                with db_lock, sqlite3.connect(DB_PATH) as conn:
+                    conn.row_factory = sqlite3.Row
+                    existing = conn.execute("SELECT * FROM ip_records WHERE ip = ?", (ip_str,)).fetchone()
+                    if result["is_online"] or existing:
+                        first_seen = existing["first_seen"] if existing and existing["first_seen"] else now_str
+                        dns_val = result["dns_name"] or (existing["dns_name"] if existing else "")
+                        mac_val = result["mac_address"] or (existing["mac_address"] if existing else "")
+                        vendor_val = result["vendor"] or (existing["vendor"] if existing else "")
+                        custom_name = existing["custom_name"] if existing else ""
+                        notes = existing["notes"] if existing else ""
+                        status_val = "reserved" if (existing and existing["status"] == "reserved") else (
+                            "active" if result["is_online"] else "offline"
+                        )
+                        role_val = result["role"] if result["is_online"] else (existing["role"] if existing else "Hôte Réseau")
+
+                        conn.execute(
+                            """
+                            INSERT INTO ip_records (
+                                ip, ip_int, subnet_cidr, dns_name, custom_name, mac_address, vendor,
+                                status, is_online, latency_ms, ttl, open_ports_json, role, os_guess,
+                                detection_method, notes, first_seen, last_seen
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(ip) DO UPDATE SET
+                                dns_name = excluded.dns_name,
+                                mac_address = excluded.mac_address,
+                                vendor = excluded.vendor,
+                                status = excluded.status,
+                                is_online = excluded.is_online,
+                                latency_ms = excluded.latency_ms,
+                                ttl = excluded.ttl,
+                                open_ports_json = excluded.open_ports_json,
+                                role = excluded.role,
+                                os_guess = excluded.os_guess,
+                                detection_method = excluded.detection_method,
+                                last_seen = CASE WHEN excluded.is_online = 1 THEN excluded.last_seen ELSE ip_records.last_seen END
+                            """,
+                            (
+                                ip_str,
+                                result["ip_int"],
+                                subnet_cidr,
+                                dns_val,
+                                custom_name,
+                                mac_val,
+                                vendor_val,
+                                status_val,
+                                1 if result["is_online"] else 0,
+                                result["latency_ms"],
+                                result["ttl"],
+                                json.dumps(result["open_ports"]),
+                                role_val,
+                                result["os_guess"],
+                                result["detection_method"],
+                                notes,
+                                first_seen,
+                                now_str,
+                            ),
+                        )
+                        conn.commit()
+
+                self._send_json({"ok": True, "probe": result})
+                return
+
             if path == "/api/ipam/update":
                 ip_str = body.get("ip", "").strip()
                 subnet_cidr = body.get("subnet_cidr", "").strip()
                 custom_name = body.get("custom_name", "").strip()
                 dns_name = body.get("dns_name", "").strip()
+                mac_raw = body.get("mac_address", "").strip()
+                mac_norm = normalize_mac(mac_raw) if mac_raw else ""
+                vendor_val = lookup_vendor(mac_norm) if mac_norm else ""
                 status_val = body.get("status", "reserved").strip()
                 role_val = body.get("role", "").strip()
                 notes_val = body.get("notes", "").strip()
@@ -1353,17 +1457,19 @@ class IPAMRequestHandler(BaseHTTPRequestHandler):
                 now_str = time.strftime("%Y-%m-%d %H:%M:%S")
 
                 with db_lock, sqlite3.connect(DB_PATH) as conn:
-                    if status_val == "free" and not custom_name and not notes_val:
+                    if status_val == "free" and not custom_name and not notes_val and not mac_norm:
                         conn.execute("DELETE FROM ip_records WHERE ip = ? AND is_online = 0", (ip_str,))
                     else:
                         conn.execute(
                             """
                             INSERT INTO ip_records (
-                                ip, ip_int, subnet_cidr, dns_name, custom_name, status, role, notes, first_seen, last_seen
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ip, ip_int, subnet_cidr, dns_name, custom_name, mac_address, vendor, status, role, notes, first_seen, last_seen
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ON CONFLICT(ip) DO UPDATE SET
                                 custom_name = excluded.custom_name,
                                 dns_name = CASE WHEN excluded.dns_name != '' THEN excluded.dns_name ELSE ip_records.dns_name END,
+                                mac_address = CASE WHEN excluded.mac_address != '' THEN excluded.mac_address ELSE ip_records.mac_address END,
+                                vendor = CASE WHEN excluded.vendor != '' THEN excluded.vendor ELSE ip_records.vendor END,
                                 status = excluded.status,
                                 role = excluded.role,
                                 notes = excluded.notes
@@ -1374,6 +1480,8 @@ class IPAMRequestHandler(BaseHTTPRequestHandler):
                                 subnet_cidr,
                                 dns_name,
                                 custom_name,
+                                mac_norm,
+                                vendor_val,
                                 status_val,
                                 role_val,
                                 notes_val,

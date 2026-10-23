@@ -427,8 +427,33 @@
         </div>
 
         <div id="modalPortsWrap" class="modal-ports-wrap">
-          <span class="info-label">Ports TCP Ouverts détectés :</span>
+          <span class="info-label">Ports TCP Ouverts (cliquez pour lancer) :</span>
           <div id="modalPortsList" class="ports-badges"></div>
+        </div>
+
+        <!-- Barre d'outils rapides : Wake-on-LAN, Test Ping/Ports en direct, Liens rapides -->
+        <div class="quick-tools-bar">
+          <span class="info-label">Outils &amp; Actions Rapides :</span>
+          <div class="quick-tools-buttons">
+            <button type="button" id="btnModalWol" class="btn btn-wol btn-sm" title="Envoyer un Magic Packet UDP (ports 9 et 7) à l'adresse MAC de cet équipement">
+              ⚡ Wake-on-LAN (Magic Packet)
+            </button>
+            <button type="button" id="btnModalProbe" class="btn btn-secondary btn-sm" title="Tester immédiatement cette IP (Ping ICMP, ARP, DNS et Ports TCP)">
+              📡 Tester l'IP en direct
+            </button>
+            <a id="btnModalHttp" href="#" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
+              🌐 HTTP ↗
+            </a>
+            <a id="btnModalHttps" href="#" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
+              🔒 HTTPS ↗
+            </a>
+            <button type="button" id="btnModalRdp" class="btn btn-outline btn-sm" title="Télécharger le fichier de bureau à distance Windows (.rdp)">
+              💻 Bureau à distance (.RDP)
+            </button>
+            <button type="button" id="btnModalSsh" class="btn btn-outline btn-sm" title="Copier la commande SSH dans le presse-papiers">
+              &gt;_ Copier SSH
+            </button>
+          </div>
         </div>
 
         <hr class="divider" />
@@ -448,6 +473,10 @@
 
           <div class="form-row-2">
             <div class="form-group">
+              <label for="editMacAddress">Adresse MAC (pour Wake-on-LAN / Statique)</label>
+              <input type="text" id="editMacAddress" class="mono" placeholder="ex: AA:BB:CC:DD:EE:FF" />
+            </div>
+            <div class="form-group">
               <label for="editStatus">Statut IPAM</label>
               <select id="editStatus">
                 <option value="active">Actif / Alloué (DHCP ou Statique)</option>
@@ -456,10 +485,11 @@
                 <option value="free">Libérer l'adresse IP</option>
               </select>
             </div>
-            <div class="form-group">
-              <label for="editRole">Catégorie / Rôle</label>
-              <input type="text" id="editRole" placeholder="ex: Serveur, Routeur, Imprimante, Poste..." />
-            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editRole">Catégorie / Rôle</label>
+            <input type="text" id="editRole" placeholder="ex: Serveur, Routeur, Imprimante, Poste..." />
           </div>
 
           <div class="form-group">

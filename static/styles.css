@@ -967,9 +967,55 @@ textarea:focus {
   border: 1px solid rgba(59, 130, 246, 0.35);
   color: #93c5fd;
   font-size: 0.71rem;
-  padding: 0.12rem 0.45rem;
+  padding: 0.15rem 0.48rem;
   border-radius: 4px;
   font-family: "JetBrains Mono", Consolas, monospace;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.port-badge:hover {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: #60a5fa;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-wol {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+}
+
+.btn-wol:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #0b0f19;
+  transform: translateY(-1px);
+}
+
+.quick-tools-bar {
+  background: rgba(13, 20, 36, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quick-tools-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.quick-tools-buttons a.btn {
+  text-decoration: none;
 }
 
 /* Modal */

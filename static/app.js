@@ -427,7 +427,77 @@ function renderSubnetGrid() {
   elIpGridContainer.appendChild(fragment);
 }
 
-// 5. Tableau IPAM Détaillé
+function buildPortBadgeHtml(ip, p) {
+  const port = p.port;
+  const svc = escapeHtml(p.service);
+  if (port === 80) {
+    return `<a href="http://${escapeHtml(ip)}" target="_blank" rel="noopener" class="port-badge" title="Ouvrir http://${escapeHtml(ip)} dans un nouvel onglet">${port}/${svc} ↗</a>`;
+  }
+  if (port === 8080) {
+    return `<a href="http://${escapeHtml(ip)}:8080" target="_blank" rel="noopener" class="port-badge" title="Ouvrir http://${escapeHtml(ip)}:8080">${port}/${svc} ↗</a>`;
+  }
+  if (port === 443) {
+    return `<a href="https://${escapeHtml(ip)}" target="_blank" rel="noopener" class="port-badge" title="Ouvrir https://${escapeHtml(ip)} dans un nouvel onglet">${port}/${svc} ↗</a>`;
+  }
+  if (port === 8443) {
+    return `<a href="https://${escapeHtml(ip)}:8443" target="_blank" rel="noopener" class="port-badge" title="Ouvrir https://${escapeHtml(ip)}:8443">${port}/${svc} ↗</a>`;
+  }
+  if (port === 3389) {
+    return `<a href="/api/tools/rdp?ip=${encodeURIComponent(ip)}" class="port-badge" title="Télécharger le fichier Bureau à distance (.rdp) pour ${escapeHtml(ip)}">💻 ${port}/${svc}</a>`;
+  }
+  if (port === 22) {
+    return `<span class="port-badge port-action-ssh" data-ip="${escapeHtml(ip)}" title="Cliquer pour copier la commande SSH (ssh root@${escapeHtml(ip)})">&gt;_ ${port}/${svc}</span>`;
+  }
+  if (port === 445 || port === 139) {
+    return `<span class="port-badge port-action-smb" data-ip="${escapeHtml(ip)}" title="Cliquer pour copier le chemin partage réseau \\\\${escapeHtml(ip)}\\">📁 ${port}/${svc}</span>`;
+  }
+  if (port === 21) {
+    return `<a href="ftp://${escapeHtml(ip)}" target="_blank" rel="noopener" class="port-badge" title="Ouvrir ftp://${escapeHtml(ip)}">${port}/${svc} ↗</a>`;
+  }
+  return `<span class="port-badge" title="Port TCP ${port} ouvert">${port}/${svc}</span>`;
+}
+
+function bindPortActionBadges(container) {
+  container.querySelectorAll(".port-action-ssh").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const ip = el.dataset.ip;
+      navigator.clipboard?.writeText(`ssh root@${ip}`);
+      showToast(`Commande copiée : ssh root@${ip}`, "info");
+    });
+  });
+  container.querySelectorAll(".port-action-smb").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const ip = el.dataset.ip;
+      navigator.clipboard?.writeText(`\\\\${ip}\\`);
+      showToast(`Chemin SMB copié : \\\\${ip}\\`, "info");
+    });
+  });
+}
+
+async function triggerWakeOnLan(mac, ip = "") {
+  if (!mac) {
+    showToast("Aucune adresse MAC renseignée pour envoyer le paquet Wake-on-LAN.", "error");
+    return;
+  }
+  const bcast = state.subnetInfo ? state.subnetInfo.broadcast_address : "255.255.255.255";
+  try {
+    const res = await fetch("/api/tools/wol", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mac: mac, ip: ip, broadcast: bcast }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`⚡ ${data.message}`, "success");
+    } else {
+      showToast(data.error || "Erreur Wake-on-LAN", "error");
+    }
+  } catch (err) {
+    showToast("Erreur réseau : " + err.message, "error");
+  }
+}
 function renderIpamTable() {
   const q = state.searchQuery.toLowerCase().trim();
 
@@ -535,12 +605,7 @@ function renderIpamTable() {
     let portsHtml = `<span class="dns-empty">—</span>`;
     if (item.open_ports && item.open_ports.length > 0) {
       portsHtml = `<div class="ports-badges">${item.open_ports
-        .map(
-          (p) =>
-            `<span class="port-badge" title="Port TCP ${p.port} ouvert">${p.port}/${escapeHtml(
-              p.service
-            )}</span>`
-        )
+        .map((p) => buildPortBadgeHtml(item.ip, p))
         .join("")}</div>`;
     }
 
@@ -562,13 +627,27 @@ function renderIpamTable() {
       <td>${portsHtml}</td>
       <td>${notesHtml}</td>
       <td class="text-right">
-        ${
-          item.state !== "network" && item.state !== "broadcast"
-            ? `<button type="button" class="btn btn-outline btn-sm btn-edit-ip">Détails / Éditer</button>`
-            : ""
-        }
+        <div class="actions-inline">
+          ${
+            item.mac_address
+              ? `<button type="button" class="btn btn-wol btn-sm btn-row-wol" title="Wake-on-LAN : Réveiller ${escapeHtml(item.mac_address)}">⚡ WoL</button>`
+              : ""
+          }
+          ${
+            item.state !== "network" && item.state !== "broadcast"
+              ? `<button type="button" class="btn btn-outline btn-sm btn-edit-ip">Détails / Éditer</button>`
+              : ""
+          }
+        </div>
       </td>
     `;
+
+    bindPortActionBadges(tr);
+
+    const wolBtn = tr.querySelector(".btn-row-wol");
+    if (wolBtn) {
+      wolBtn.addEventListener("click", () => triggerWakeOnLan(item.mac_address, item.ip));
+    }
 
     if (item.state !== "network" && item.state !== "broadcast") {
       tr.querySelector(".ip-link").addEventListener("click", () => openIpModal(item));
@@ -965,18 +1044,82 @@ function openIpModal(item) {
 
   elModalPortsList.innerHTML = "";
   if (item.open_ports && item.open_ports.length > 0) {
-    item.open_ports.forEach((p) => {
-      const span = document.createElement("span");
-      span.className = "port-badge";
-      span.textContent = `${p.port} / ${p.service}`;
-      elModalPortsList.appendChild(span);
-    });
+    elModalPortsList.innerHTML = item.open_ports
+      .map((p) => buildPortBadgeHtml(item.ip, p))
+      .join("");
+    bindPortActionBadges(elModalPortsList);
   } else {
     elModalPortsList.innerHTML = `<span class="text-muted">Aucun port TCP courant détecté ouvert</span>`;
   }
 
+  // Configurer les boutons de la barre d'outils rapides
+  const btnHttp = document.getElementById("btnModalHttp");
+  const btnHttps = document.getElementById("btnModalHttps");
+  const btnRdp = document.getElementById("btnModalRdp");
+  const btnSsh = document.getElementById("btnModalSsh");
+  const btnWol = document.getElementById("btnModalWol");
+  const btnProbe = document.getElementById("btnModalProbe");
+  const elEditMac = document.getElementById("editMacAddress");
+
+  if (btnHttp) btnHttp.href = `http://${item.ip}`;
+  if (btnHttps) btnHttps.href = `https://${item.ip}`;
+  if (btnRdp) {
+    btnRdp.onclick = () => {
+      window.location.href = `/api/tools/rdp?ip=${encodeURIComponent(item.ip)}`;
+    };
+  }
+  if (btnSsh) {
+    btnSsh.onclick = () => {
+      navigator.clipboard?.writeText(`ssh root@${item.ip}`);
+      showToast(`Commande SSH copiée : ssh root@${item.ip}`, "info");
+    };
+  }
+  if (btnWol) {
+    btnWol.onclick = () => {
+      const macToUse = (elEditMac && elEditMac.value.trim()) || item.mac_address;
+      triggerWakeOnLan(macToUse, item.ip);
+    };
+  }
+  if (btnProbe) {
+    btnProbe.onclick = async () => {
+      btnProbe.disabled = true;
+      btnProbe.textContent = "⏳ Test en cours...";
+      try {
+        const res = await fetch("/api/tools/probe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ip: item.ip,
+            subnet_cidr: state.subnetInfo ? state.subnetInfo.cidr : "",
+          }),
+        });
+        const data = await res.json();
+        if (data.ok && data.probe) {
+          const p = data.probe;
+          if (p.is_online) {
+            showToast(
+              `${p.ip} est EN LIGNE (${p.latency_ms !== null ? p.latency_ms + " ms" : p.detection_method}) !`,
+              "success"
+            );
+          } else {
+            showToast(`${p.ip} ne répond pas (Hors-ligne).`, "info");
+          }
+          await loadIpamData();
+          const updatedItem = state.addresses.find((a) => a.ip === item.ip);
+          if (updatedItem) openIpModal(updatedItem);
+        }
+      } catch (err) {
+        showToast("Erreur lors du test : " + err.message, "error");
+      } finally {
+        btnProbe.disabled = false;
+        btnProbe.textContent = "📡 Tester l'IP en direct";
+      }
+    };
+  }
+
   elEditCustomName.value = item.custom_name || "";
   elEditDnsName.value = item.dns_name || "";
+  if (elEditMac) elEditMac.value = item.mac_address || "";
   elEditStatus.value =
     item.state === "free" ? "reserved" : item.status || (item.is_online ? "active" : "reserved");
   elEditRole.value = item.role && item.role !== "Disponible" ? item.role : "";
@@ -991,11 +1134,13 @@ function closeIpModal() {
 
 async function saveIpModal(e) {
   e.preventDefault();
+  const elEditMac = document.getElementById("editMacAddress");
   const payload = {
     ip: elEditIp.value,
     subnet_cidr: state.subnetInfo ? state.subnetInfo.cidr : "",
     custom_name: elEditCustomName.value.trim(),
     dns_name: elEditDnsName.value.trim(),
+    mac_address: elEditMac ? elEditMac.value.trim() : "",
     status: elEditStatus.value,
     role: elEditRole.value.trim(),
     notes: elEditNotes.value.trim(),

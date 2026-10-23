@@ -11,9 +11,11 @@ Supporte :
 
 import concurrent.futures
 import ipaddress
+import os
 import platform
 import re
 import socket
+import struct
 import subprocess
 import threading
 import time
@@ -171,32 +173,50 @@ def get_local_interfaces() -> List[Dict]:
         except Exception:
             pass
     else:
-        # Linux / macOS / Docker Container
+        # Linux / macOS / Docker Container — Détection native ultra-rapide sans dépendance apt
         default_gw = ""
         try:
-            gw_proc = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True, timeout=3)
-            m_gw = re.search(r"default\s+via\s+(\d+\.\d+\.\d+\.\d+)", gw_proc.stdout)
-            if m_gw:
-                default_gw = m_gw.group(1)
+            with open("/proc/net/route", "r", encoding="utf-8") as f:
+                for line in f.read().splitlines()[1:]:
+                    parts = line.split()
+                    if len(parts) >= 3 and parts[1] == "00000000" and parts[2] != "00000000":
+                        gw_int = int(parts[2], 16)
+                        default_gw = socket.inet_ntoa(struct.pack("<L", gw_int))
+                        break
         except Exception:
             pass
 
+        # Lecture directe des interfaces via ioctl (SIOCGIFADDR = 0x8915, SIOCGIFNETMASK = 0x891b)
         try:
-            proc = subprocess.run(["ip", "-4", "-o", "addr", "show"], capture_output=True, text=True, timeout=4)
-            for line in proc.stdout.splitlines():
-                m = re.search(r"^\d+:\s+(\S+)\s+inet\s+(\d+\.\d+\.\d+\.\d+)/(\d+)", line)
-                if m:
-                    iface, ip_str, prefix_str = m.group(1), m.group(2), m.group(3)
-                    if ip_str != "127.0.0.1" and not ip_str.startswith("169.254."):
-                        net = ipaddress.IPv4Network(f"{ip_str}/{prefix_str}", strict=False)
+            import fcntl
+            if os.path.isdir("/sys/class/net"):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                for iface in sorted(os.listdir("/sys/class/net")):
+                    if iface == "lo" or iface.startswith("veth") or iface.startswith("br-") or iface.startswith("docker"):
+                        continue
+                    try:
+                        ifreq = struct.pack("256s", iface[:15].encode("utf-8"))
+                        ip_bytes = fcntl.ioctl(sock.fileno(), 0x8915, ifreq)[20:24]
+                        mask_bytes = fcntl.ioctl(sock.fileno(), 0x891B, ifreq)[20:24]
+                        ip_str = socket.inet_ntoa(ip_bytes)
+                        mask_str = socket.inet_ntoa(mask_bytes)
+                        if ip_str == "127.0.0.1" or ip_str.startswith("169.254."):
+                            continue
+                        net = ipaddress.IPv4Network(f"{ip_str}/{mask_str}", strict=False)
                         net_24 = ipaddress.IPv4Network(f"{ip_str}/24", strict=False)
                         mac_addr = ""
                         try:
-                            iface_clean = iface.split("@")[0]
-                            with open(f"/sys/class/net/{iface_clean}/address", "r") as f:
-                                mac_addr = normalize_mac(f.read().strip())
+                            with open(f"/sys/class/net/{iface}/address", "r", encoding="utf-8") as mf:
+                                mac_addr = normalize_mac(mf.read().strip())
                         except Exception:
                             pass
+                        gw_for_iface = ""
+                        if default_gw:
+                            try:
+                                if ipaddress.IPv4Address(default_gw) in net:
+                                    gw_for_iface = default_gw
+                            except Exception:
+                                pass
                         interfaces.append({
                             "name": iface,
                             "ip": ip_str,
@@ -206,10 +226,38 @@ def get_local_interfaces() -> List[Dict]:
                             "subnet_24": str(net_24.network_address),
                             "cidr": str(net),
                             "mac": mac_addr,
-                            "gateway": default_gw if ipaddress.IPv4Address(default_gw) in net else "" if default_gw else "",
+                            "gateway": gw_for_iface,
                         })
+                    except Exception:
+                        continue
+                sock.close()
         except Exception:
             pass
+
+        # Fallback ip addr si ioctl n'a rien remonté
+        if not interfaces:
+            try:
+                proc = subprocess.run(["ip", "-4", "-o", "addr", "show"], capture_output=True, text=True, timeout=4)
+                for line in proc.stdout.splitlines():
+                    m = re.search(r"^\d+:\s+(\S+)\s+inet\s+(\d+\.\d+\.\d+\.\d+)/(\d+)", line)
+                    if m:
+                        iface, ip_str, prefix_str = m.group(1), m.group(2), m.group(3)
+                        if ip_str != "127.0.0.1" and not ip_str.startswith("169.254."):
+                            net = ipaddress.IPv4Network(f"{ip_str}/{prefix_str}", strict=False)
+                            net_24 = ipaddress.IPv4Network(f"{ip_str}/24", strict=False)
+                            interfaces.append({
+                                "name": iface,
+                                "ip": ip_str,
+                                "netmask": str(net.netmask),
+                                "prefixlen": net.prefixlen,
+                                "network": str(net.network_address),
+                                "subnet_24": str(net_24.network_address),
+                                "cidr": str(net),
+                                "mac": "",
+                                "gateway": default_gw,
+                            })
+            except Exception:
+                pass
 
     # Ultime fallback socket UDP
     if not interfaces:
@@ -289,12 +337,64 @@ def get_arp_table() -> Dict[str, str]:
     return arp_map
 
 
+def _icmp_checksum(data: bytes) -> int:
+    s = 0
+    n = len(data)
+    i = 0
+    while i < n - 1:
+        s += (data[i] << 8) + data[i + 1]
+        i += 2
+    if i < n:
+        s += data[i] << 8
+    s = (s >> 16) + (s & 0xFFFF)
+    s += s >> 16
+    return ~s & 0xFFFF
+
+
 def ping_host(ip_str: str, timeout_ms: int = 500) -> Tuple[bool, Optional[float], Optional[int]]:
     """
     Effectue un ping ICMP vers `ip_str`.
+    Sous Linux/Docker, utilise en priorité un socket ICMP natif (ultra-rapide, zéro sous-processus)
+    avec fallback sur la commande `ping`.
     Retourne (is_alive, latency_ms, ttl).
     """
     system = platform.system().lower()
+
+    # 1. Socket ICMP natif sous Linux / Docker (CAP_NET_RAW)
+    if system != "windows":
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP) as sock:
+                sock.settimeout(timeout_ms / 1000.0)
+                pkt_id = (threading.get_ident() ^ int(ip_str.split(".")[-1])) & 0xFFFF
+                seq = 1
+                payload = b"NetPulseIPAM1234"
+                header = struct.pack("!BBHHH", 8, 0, 0, pkt_id, seq)
+                chksum = _icmp_checksum(header + payload)
+                packet = struct.pack("!BBHHH", 8, 0, chksum, pkt_id, seq) + payload
+
+                t0 = time.perf_counter()
+                sock.sendto(packet, (ip_str, 1))
+                while True:
+                    remaining = (timeout_ms / 1000.0) - (time.perf_counter() - t0)
+                    if remaining <= 0:
+                        break
+                    sock.settimeout(remaining)
+                    recv_data, addr = sock.recvfrom(1024)
+                    if addr[0] == ip_str and len(recv_data) >= 28:
+                        ip_ttl = recv_data[8]
+                        icmp_type, icmp_code, _, r_id, _ = struct.unpack("!BBHHH", recv_data[20:28])
+                        if icmp_type == 0 and icmp_code == 0 and r_id == pkt_id:
+                            lat = round((time.perf_counter() - t0) * 1000.0, 1)
+                            return True, max(0.1, lat), int(ip_ttl)
+                return False, None, None
+        except PermissionError:
+            pass
+        except socket.timeout:
+            return False, None, None
+        except Exception:
+            pass
+
+    # 2. Commande système ping (Windows ou fallback Linux sans CAP_NET_RAW)
     if system == "windows":
         cmd = ["ping", "-n", "1", "-w", str(timeout_ms), ip_str]
     else:
@@ -401,6 +501,73 @@ def scan_tcp_ports(ip_str: str, ports: List[int], timeout_sec: float = 0.22) -> 
         except Exception:
             pass
     return open_ports
+
+
+def send_wake_on_lan(mac_str: str, broadcast_ip: str = "255.255.255.255") -> str:
+    """
+    Envoie un Magic Packet Wake-on-LAN (UDP ports 9 et 7) pour réveiller l'équipement
+    correspondant à `mac_str`. Retourne l'adresse MAC normalisée.
+    """
+    mac = normalize_mac(mac_str)
+    hex_clean = mac.replace(":", "")
+    if len(hex_clean) != 12 or not all(c in "0123456789ABCDEF" for c in hex_clean):
+        raise ValueError(f"Adresse MAC invalide pour Wake-on-LAN : '{mac_str}'")
+
+    mac_bytes = bytes.fromhex(hex_clean)
+    magic_packet = b"\xff" * 6 + mac_bytes * 16
+
+    targets = {"255.255.255.255"}
+    if broadcast_ip and broadcast_ip.strip():
+        targets.add(broadcast_ip.strip())
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        for target in targets:
+            for port in (9, 7):
+                try:
+                    sock.sendto(magic_packet, (target, port))
+                except Exception:
+                    pass
+
+    return mac
+
+
+def probe_single_host(ip_str: str, timeout_ms: int = 600) -> Dict:
+    """Teste une seule adresse IPv4 en direct (Ping + ARP + DNS + Ports TCP)."""
+    ip_obj = ipaddress.IPv4Address(ip_str.strip())
+    ip_s = str(ip_obj)
+
+    alive, lat, ttl = ping_host(ip_s, timeout_ms=timeout_ms)
+    arp_map = get_arp_table()
+    mac = arp_map.get(ip_s, "")
+    vendor = lookup_vendor(mac) if mac else ""
+    open_ports = scan_tcp_ports(ip_s, DEFAULT_SCAN_PORTS, timeout_sec=0.25)
+    is_online = bool(alive or mac or open_ports)
+    dns_name = resolve_dns_name(ip_s) if is_online else ""
+    role, os_guess = guess_os_and_role(
+        ttl=ttl,
+        open_ports=open_ports,
+        vendor=vendor,
+        hostname=dns_name,
+        is_gateway=False,
+        is_server=False,
+    )
+
+    return {
+        "ip": ip_s,
+        "ip_int": int(ip_obj),
+        "is_online": is_online,
+        "latency_ms": lat,
+        "ttl": ttl,
+        "mac_address": mac,
+        "vendor": vendor,
+        "dns_name": dns_name,
+        "open_ports": open_ports,
+        "role": role,
+        "os_guess": os_guess,
+        "detection_method": "ICMP + ARP" if (alive and mac) else ("ICMP Ping" if alive else ("Ports TCP" if open_ports else ("Table ARP" if mac else "Hors-ligne"))),
+        "last_seen": time.strftime("%Y-%m-%d %H:%M:%S") if is_online else "",
+    }
 
 
 def guess_os_and_role(ttl: Optional[int], open_ports: List[Dict], vendor: str, hostname: str, is_gateway: bool, is_server: bool) -> Tuple[str, str]:

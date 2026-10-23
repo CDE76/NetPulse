@@ -6,19 +6,16 @@ services:
     restart: unless-stopped
     working_dir: /app
     command:
-      - sh
+      - python3
       - -c
       - |
-        export DEBIAN_FRONTEND=noninteractive
-        if ! command -v ping >/dev/null 2>&1; then
-          apt-get update -qq &&
-          apt-get install -y -qq --no-install-recommends iputils-ping iproute2 net-tools dnsutils ca-certificates
-        fi
-        python3 -c "import urllib.request, tarfile, shutil; urllib.request.urlretrieve('https://github.com/CDE76/NetPulse/archive/refs/heads/main.tar.gz', '/tmp/app.tar.gz'); tarfile.open('/tmp/app.tar.gz').extractall('/tmp', filter='data'); shutil.copytree('/tmp/NetPulse-main', '/app', dirs_exist_ok=True)" &&
-        python3 /app/app.py
+        import urllib.request, tarfile, shutil, subprocess, sys
+        urllib.request.urlretrieve('https://github.com/CDE76/NetPulse/archive/refs/heads/main.tar.gz', '/tmp/app.tar.gz')
+        tarfile.open('/tmp/app.tar.gz').extractall('/tmp', filter='data')
+        shutil.copytree('/tmp/NetPulse-main', '/app', dirs_exist_ok=True)
+        sys.exit(subprocess.call(['python3', '/app/app.py']))
     environment:
       - PYTHONUNBUFFERED=1
-      - DEBIAN_FRONTEND=noninteractive
       - PORT=${PORT:-8095}
       - IPAM_DATA_DIR=/data
       - IPAM_ADMIN_USER=${IPAM_ADMIN_USER:-admin}
